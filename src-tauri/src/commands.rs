@@ -1,7 +1,7 @@
 use crate::discord::{is_discord_running, load_games, SpoofMethod, SpoofableGame};
 use crate::history;
-use crate::spoofer::{self, RunContext};
-use crate::state::{AppState, SpooferConfig, SpooferStatus, StatusEvent};
+use crate::spoofer;
+use crate::state::{AppState, RunContext, SpooferConfig, SpooferStatus, StatusEvent};
 use serde::Serialize;
 use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Emitter, State};
