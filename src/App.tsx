@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { clsx } from "clsx";
 import {
   Database,
@@ -9,6 +8,10 @@ import {
   Terminal,
   Timer,
 } from "lucide-react";
+import { api } from "./lib/api";
+import { useDiscordStatus } from "./hooks/useDiscordStatus";
+import { DatabaseView } from "./views/DatabaseView";
+import { PlaceholderView } from "./views/PlaceholderView";
 
 type TabId = "dashboard" | "farm" | "database" | "settings" | "console";
 
@@ -17,33 +20,27 @@ type NavItem = {
   label: string;
   hint: string;
   icon: typeof LayoutDashboard;
+  stage: string;
 };
 
 const NAV: NavItem[] = [
-  { id: "dashboard", label: "Универсал", hint: "Перебор игр", icon: LayoutDashboard },
-  { id: "farm", label: "Фарм часов", hint: "Время в играх", icon: Timer },
-  { id: "database", label: "База игр", hint: "Список Discord", icon: Database },
-  { id: "settings", label: "Настройки", hint: "История и язык", icon: Settings },
-  { id: "console", label: "Консоль", hint: "Логи", icon: Terminal },
-];
-
-const ROADMAP = [
-  "M1 — загрузка и кэш базы игр Discord",
-  "M2 — движок эмуляции процессов",
-  "M3 — Dashboard и консоль",
-  "M4 — фарм, база и настройки",
-  "M5 — дисклеймер, документация, релиз",
+  { id: "dashboard", label: "Универсал", hint: "Перебор игр", icon: LayoutDashboard, stage: "M2" },
+  { id: "farm", label: "Фарм часов", hint: "Время в играх", icon: Timer, stage: "M4" },
+  { id: "database", label: "База игр", hint: "Список Discord", icon: Database, stage: "M1" },
+  { id: "settings", label: "Настройки", hint: "История и язык", icon: Settings, stage: "M4" },
+  { id: "console", label: "Консоль", hint: "Логи", icon: Terminal, stage: "M3" },
 ];
 
 export default function App() {
-  const [tab, setTab] = useState<TabId>("dashboard");
+  const [tab, setTab] = useState<TabId>("database");
   const [version, setVersion] = useState("…");
+  const discord = useDiscordStatus();
 
   const active = NAV.find((item) => item.id === tab) ?? NAV[0];
-  const ActiveIcon = active.icon;
 
   useEffect(() => {
-    invoke<string>("app_version")
+    api
+      .version()
       .then(setVersion)
       .catch(() => setVersion("unknown"));
   }, []);
@@ -108,40 +105,26 @@ export default function App() {
             <p className="text-[11px] text-zinc-500">{active.hint}</p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-white/5 bg-ink-900 px-3 py-1.5 text-[11px] text-zinc-400">
-            <span className="h-2 w-2 rounded-full bg-zinc-600" />
-            Проверка Discord появится в M2
+            <span
+              className={clsx(
+                "h-2 w-2 rounded-full",
+                discord === true ? "bg-ok" : discord === false ? "bg-danger" : "bg-zinc-600",
+              )}
+            />
+            {discord === true
+              ? "Discord запущен"
+              : discord === false
+                ? "Discord не найден"
+                : "Проверка…"}
           </div>
         </header>
 
         <section className="scrollbar-thin flex-1 overflow-y-auto p-6">
-          <div className="mx-auto max-w-2xl rounded-2xl border border-white/5 bg-ink-900 p-6">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-lg bg-brand/15">
-                <ActiveIcon className="h-4 w-4 text-brand" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-white">Каркас собран</h2>
-                <p className="text-[11px] text-zinc-500">Этап M0 завершён</p>
-              </div>
-            </div>
-
-            <p className="mt-4 text-sm leading-relaxed text-zinc-400">
-              Интерфейс и Rust-бэкенд связаны: версия бэкенда{" "}
-              <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-zinc-300">
-                {version}
-              </span>
-              . Функциональность появится на следующих этапах.
-            </p>
-
-            <ul className="mt-4 space-y-1.5">
-              {ROADMAP.map((line) => (
-                <li key={line} className="flex items-start gap-2 text-[13px] text-zinc-400">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-brand" />
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </div>
+          {tab === "database" ? (
+            <DatabaseView />
+          ) : (
+            <PlaceholderView title={active.label} stage={active.stage} />
+          )}
         </section>
       </main>
     </div>
