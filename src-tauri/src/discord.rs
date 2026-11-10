@@ -7,12 +7,24 @@
 use crate::history::app_dir;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const DETECTABLE_URL: &str = "https://discord.com/api/v9/applications/detectable";
 const CACHE_TTL_SECS: u64 = 12 * 60 * 60;
 const CACHE_VERSION: u32 = 1;
 const MAX_ATTEMPTS: u32 = 3;
+
+static OFFLINE: AtomicBool = AtomicBool::new(false);
+
+/// Offline mode forbids every network request; only the local cache is used.
+pub fn set_offline(value: bool) {
+    OFFLINE.store(value, Ordering::SeqCst);
+}
+
+fn is_offline() -> bool {
+    OFFLINE.load(Ordering::SeqCst)
+}
 
 /// How a game can be emulated on this platform.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,6 +116,13 @@ fn save_cache(games: &[SpoofableGame]) {
 /// Returns the games and whether they came from the cache.
 pub async fn load_games(force_refresh: bool) -> Result<(Vec<SpoofableGame>, bool), String> {
     let cached = load_cache();
+
+    if is_offline() {
+        return match cached {
+            Some(cache) => Ok((cache.games, true)),
+            None => Err("Включён офлайн-режим, а сохранённой базы нет. Отключите офлайн-режим и обновите базу.".to_string()),
+        };
+    }
 
     if !force_refresh {
         if let Some(cache) = &cached {

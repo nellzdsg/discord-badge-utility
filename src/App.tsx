@@ -1,20 +1,24 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { clsx } from "clsx";
 import {
   Database,
   LayoutDashboard,
-  Settings,
+  Settings as SettingsIcon,
   ShieldCheck,
   Terminal,
   Timer,
 } from "lucide-react";
 import { api } from "./lib/api";
 import { useDiscordStatus } from "./hooks/useDiscordStatus";
+import { useFarm } from "./hooks/useFarm";
 import { useSpoofer } from "./hooks/useSpoofer";
 import { ConsoleView } from "./views/ConsoleView";
 import { DashboardView } from "./views/DashboardView";
 import { DatabaseView } from "./views/DatabaseView";
-import { PlaceholderView } from "./views/PlaceholderView";
+import { DisclaimerOverlay } from "./views/DisclaimerOverlay";
+import { FarmView } from "./views/FarmView";
+import { SettingsView } from "./views/SettingsView";
+import type { Settings } from "./types/settings";
 
 type TabId = "dashboard" | "farm" | "database" | "settings" | "console";
 
@@ -23,22 +27,29 @@ type NavItem = {
   label: string;
   hint: string;
   icon: typeof LayoutDashboard;
-  stage: string;
 };
 
 const NAV: NavItem[] = [
-  { id: "dashboard", label: "Универсал", hint: "Перебор игр", icon: LayoutDashboard, stage: "M2" },
-  { id: "farm", label: "Фарм часов", hint: "Время в играх", icon: Timer, stage: "M4" },
-  { id: "database", label: "База игр", hint: "Список Discord", icon: Database, stage: "M1" },
-  { id: "settings", label: "Настройки", hint: "История и язык", icon: Settings, stage: "M4" },
-  { id: "console", label: "Консоль", hint: "Логи", icon: Terminal, stage: "M2" },
+  { id: "dashboard", label: "Универсал", hint: "Перебор игр", icon: LayoutDashboard },
+  { id: "farm", label: "Фарм часов", hint: "Время в играх", icon: Timer },
+  { id: "database", label: "База игр", hint: "Список Discord", icon: Database },
+  { id: "settings", label: "Настройки", hint: "Офлайн и история", icon: SettingsIcon },
+  { id: "console", label: "Консоль", hint: "Логи", icon: Terminal },
 ];
+
+const FALLBACK_SETTINGS: Settings = {
+  language: "ru",
+  offline: false,
+  disclaimer_accepted: true,
+};
 
 export default function App() {
   const [tab, setTab] = useState<TabId>("dashboard");
   const [version, setVersion] = useState("…");
+  const [settings, setSettings] = useState<Settings | null>(null);
   const discord = useDiscordStatus();
   const spoofer = useSpoofer();
+  const farm = useFarm();
 
   const active = NAV.find((item) => item.id === tab) ?? NAV[0];
 
@@ -47,7 +58,24 @@ export default function App() {
       .version()
       .then(setVersion)
       .catch(() => setVersion("unknown"));
+
+    api
+      .getSettings()
+      .then(setSettings)
+      .catch(() => setSettings(FALLBACK_SETTINGS));
   }, []);
+
+  const updateSettings = useCallback(async (next: Settings) => {
+    await api.saveSettings(next);
+    setSettings(next);
+  }, []);
+
+  const acceptDisclaimer = useCallback(async () => {
+    if (!settings) return;
+    const next = { ...settings, disclaimer_accepted: true };
+    await api.saveSettings(next);
+    setSettings(next);
+  }, [settings]);
 
   return (
     <div className="flex h-full">
@@ -136,17 +164,30 @@ export default function App() {
             />
           )}
 
+          {tab === "farm" && <FarmView tick={farm.tick} start={farm.start} stop={farm.stop} />}
+
           {tab === "database" && <DatabaseView />}
+
+          {tab === "settings" &&
+            (settings ? (
+              <SettingsView
+                settings={settings}
+                version={version}
+                onUpdate={updateSettings}
+              />
+            ) : (
+              <p className="text-[12px] text-zinc-500">Загрузка настроек…</p>
+            ))}
 
           {tab === "console" && (
             <ConsoleView logs={spoofer.logs} onClear={spoofer.clearLogs} />
           )}
-
-          {tab !== "dashboard" && tab !== "database" && tab !== "console" && (
-            <PlaceholderView title={active.label} stage={active.stage} />
-          )}
         </section>
       </main>
+
+      {settings && !settings.disclaimer_accepted && (
+        <DisclaimerOverlay onAccept={acceptDisclaimer} />
+      )}
     </div>
   );
 }

@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 const EN: u8 = 0;
 const RU: u8 = 1;
 
-static LANGUAGE: AtomicU8 = AtomicU8::new(EN);
+static LANGUAGE: AtomicU8 = AtomicU8::new(RU);
 
 /// Updates the language used for backend messages. Unknown values fall back to English.
 pub fn set_language(code: &str) {

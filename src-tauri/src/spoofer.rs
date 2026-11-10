@@ -25,9 +25,9 @@ const TICK_MS: u64 = 200;
 const MAX_PATH_LEN: usize = 240;
 
 #[cfg(windows)]
-const DUMMY_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/dummy.exe"));
+pub(crate) const DUMMY_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/dummy.exe"));
 #[cfg(not(windows))]
-const DUMMY_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/dummy"));
+pub(crate) const DUMMY_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/dummy"));
 
 fn msg(russian: String, english: String) -> String {
     if is_russian() {
@@ -57,11 +57,11 @@ async fn set_status(
     let _ = app.emit("spoofer_status", StatusEvent { status, message });
 }
 
-fn temp_root() -> PathBuf {
+pub(crate) fn temp_root() -> PathBuf {
     std::env::temp_dir().join("discord-badge-utility")
 }
 
-fn cleanup(path: &Path) {
+pub(crate) fn cleanup(path: &Path) {
     if path.exists() {
         let _ = fs::remove_dir_all(path);
     }
@@ -141,7 +141,7 @@ fn emit_tick(
     );
 }
 
-fn spawn_process(path: &Path) -> std::io::Result<std::process::Child> {
+pub(crate) fn spawn_process(path: &Path) -> std::io::Result<std::process::Child> {
     let mut command = std::process::Command::new(path);
     #[cfg(windows)]
     {
@@ -171,16 +171,44 @@ pub fn force_kill(pid: u32) {
     }
 }
 
+/// Checks whether a process is still alive. Used by the farm to respawn a
+/// helper that was killed from outside (task manager, antivirus, etc.).
+pub(crate) fn is_alive(pid: u32) -> bool {
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::Foundation::CloseHandle;
+        use windows_sys::Win32::System::Threading::{
+            GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, STILL_ACTIVE,
+        };
+
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if handle.is_null() {
+            return false;
+        }
+
+        let mut code: u32 = 0;
+        let ok = GetExitCodeProcess(handle, &mut code);
+        CloseHandle(handle);
+
+        ok != 0 && code == STILL_ACTIVE as u32
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = pid;
+        false
+    }
+}
+
 /// Win32 Job Object that kills every assigned process when the handle closes.
 /// This is what guarantees no orphan helper processes after a crash.
 #[cfg(windows)]
-struct JobGuard {
+pub(crate) struct JobGuard {
     handle: windows_sys::Win32::Foundation::HANDLE,
 }
 
 #[cfg(windows)]
 impl JobGuard {
-    fn new() -> Option<Self> {
+    pub(crate) fn new() -> Option<Self> {
         use windows_sys::Win32::Foundation::CloseHandle;
         use windows_sys::Win32::System::JobObjects::{
             CreateJobObjectW, JobObjectExtendedLimitInformation, SetInformationJobObject,
@@ -212,7 +240,7 @@ impl JobGuard {
         }
     }
 
-    fn assign(&self, pid: u32) {
+    pub(crate) fn assign(&self, pid: u32) {
         use windows_sys::Win32::Foundation::CloseHandle;
         use windows_sys::Win32::System::JobObjects::AssignProcessToJobObject;
         use windows_sys::Win32::System::Threading::{
@@ -244,14 +272,14 @@ unsafe impl Send for JobGuard {}
 unsafe impl Sync for JobGuard {}
 
 #[cfg(not(windows))]
-struct JobGuard;
+pub(crate) struct JobGuard;
 
 #[cfg(not(windows))]
 impl JobGuard {
-    fn new() -> Option<Self> {
+    pub(crate) fn new() -> Option<Self> {
         None
     }
-    fn assign(&self, _pid: u32) {}
+    pub(crate) fn assign(&self, _pid: u32) {}
 }
 
 pub async fn run(
