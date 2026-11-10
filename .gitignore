@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Frontend build output
+dist/
+
+# Rust build output
+src-tauri/target/
+
+# Generated at build time
+src-tauri/gen/
+src-tauri/icons/
+
+# Local helper scripts
+push.bat
+push.ps1
+push.log
+
+# Logs and environment
+*.log
+.env
+.env.*
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store
