@@ -178,8 +178,12 @@ pub(crate) fn is_alive(pid: u32) -> bool {
     unsafe {
         use windows_sys::Win32::Foundation::CloseHandle;
         use windows_sys::Win32::System::Threading::{
-            GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, STILL_ACTIVE,
+            GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
         };
+
+        // STILL_ACTIVE is 259; windows-sys exposes it under a different module
+        // depending on the version, so the literal keeps this stable.
+        const STILL_ACTIVE: u32 = 259;
 
         let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
         if handle.is_null() {
@@ -190,7 +194,7 @@ pub(crate) fn is_alive(pid: u32) -> bool {
         let ok = GetExitCodeProcess(handle, &mut code);
         CloseHandle(handle);
 
-        ok != 0 && code == STILL_ACTIVE as u32
+        ok != 0 && code == STILL_ACTIVE
     }
     #[cfg(not(windows))]
     {
