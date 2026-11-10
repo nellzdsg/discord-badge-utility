@@ -2,6 +2,7 @@ pub mod commands;
 pub mod discord;
 pub mod history;
 pub mod i18n;
+pub mod spoofer;
 pub mod state;
 
 use state::AppState;
@@ -20,6 +21,11 @@ pub fn run() {
             commands::fetch_games,
             commands::get_games,
             commands::check_discord_status,
+            commands::start_spoofer,
+            commands::pause_spoofer,
+            commands::resume_spoofer,
+            commands::stop_spoofer,
+            commands::get_spoofer_state,
             commands::get_history,
             commands::clear_history,
             commands::export_history,

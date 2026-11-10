@@ -1,8 +1,10 @@
 use crate::discord::{is_discord_running, load_games, SpoofMethod, SpoofableGame};
 use crate::history;
-use crate::state::AppState;
+use crate::spoofer::{self, RunContext};
+use crate::state::{AppState, SpooferConfig, SpooferStatus, StatusEvent};
 use serde::Serialize;
-use tauri::State;
+use std::sync::atomic::Ordering;
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Serialize)]
 pub struct GamesResponse {
@@ -49,6 +51,117 @@ pub async fn get_games(state: State<'_, AppState>) -> Result<Vec<SpoofableGame>,
 #[tauri::command]
 pub fn check_discord_status() -> bool {
     is_discord_running()
+}
+
+#[tauri::command]
+pub async fn start_spoofer(
+    config: SpooferConfig,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    {
+        let status = *state.status.read().await;
+        if matches!(status, SpooferStatus::Running | SpooferStatus::Paused) {
+            return Err("Emulation is already running".to_string());
+        }
+    }
+
+    let games = state.games.read().await.clone();
+    if games.is_empty() {
+        return Err("The game database is empty. Open \"Games\" and load it first.".to_string());
+    }
+
+    state.cancel.store(false, Ordering::SeqCst);
+    state.pause.store(false, Ordering::SeqCst);
+
+    let ctx = RunContext {
+        status: state.status.clone(),
+        cancel: state.cancel.clone(),
+        pause: state.pause.clone(),
+        active_pids: state.active_pids.clone(),
+    };
+
+    let handle = tokio::spawn(async move {
+        spoofer::run(app, games, config, ctx).await;
+    });
+
+    *state.task.lock().await = Some(handle);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn pause_spoofer(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    if *state.status.read().await != SpooferStatus::Running {
+        return Err("Emulation is not running".to_string());
+    }
+
+    state.pause.store(true, Ordering::SeqCst);
+    *state.status.write().await = SpooferStatus::Paused;
+    let _ = app.emit(
+        "spoofer_status",
+        StatusEvent {
+            status: SpooferStatus::Paused,
+            message: None,
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn resume_spoofer(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    if *state.status.read().await != SpooferStatus::Paused {
+        return Err("Emulation is not paused".to_string());
+    }
+
+    state.pause.store(false, Ordering::SeqCst);
+    *state.status.write().await = SpooferStatus::Running;
+    let _ = app.emit(
+        "spoofer_status",
+        StatusEvent {
+            status: SpooferStatus::Running,
+            message: None,
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn stop_spoofer(state: State<'_, AppState>, app: AppHandle) -> Result<(), String> {
+    state.cancel.store(true, Ordering::SeqCst);
+    state.pause.store(false, Ordering::SeqCst);
+
+    let pids: Vec<u32> = {
+        let mut guard = state.active_pids.lock().await;
+        std::mem::take(&mut *guard)
+    };
+    for pid in pids {
+        spoofer::force_kill(pid);
+    }
+
+    if let Some(handle) = state.task.lock().await.take() {
+        handle.abort();
+    }
+
+    *state.status.write().await = SpooferStatus::Idle;
+    let _ = app.emit(
+        "spoofer_status",
+        StatusEvent {
+            status: SpooferStatus::Idle,
+            message: None,
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_spoofer_state(state: State<'_, AppState>) -> Result<SpooferStatus, String> {
+    Ok(*state.status.read().await)
 }
 
 #[tauri::command]

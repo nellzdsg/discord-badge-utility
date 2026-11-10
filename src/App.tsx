@@ -10,6 +10,9 @@ import {
 } from "lucide-react";
 import { api } from "./lib/api";
 import { useDiscordStatus } from "./hooks/useDiscordStatus";
+import { useSpoofer } from "./hooks/useSpoofer";
+import { ConsoleView } from "./views/ConsoleView";
+import { DashboardView } from "./views/DashboardView";
 import { DatabaseView } from "./views/DatabaseView";
 import { PlaceholderView } from "./views/PlaceholderView";
 
@@ -28,13 +31,14 @@ const NAV: NavItem[] = [
   { id: "farm", label: "Фарм часов", hint: "Время в играх", icon: Timer, stage: "M4" },
   { id: "database", label: "База игр", hint: "Список Discord", icon: Database, stage: "M1" },
   { id: "settings", label: "Настройки", hint: "История и язык", icon: Settings, stage: "M4" },
-  { id: "console", label: "Консоль", hint: "Логи", icon: Terminal, stage: "M3" },
+  { id: "console", label: "Консоль", hint: "Логи", icon: Terminal, stage: "M2" },
 ];
 
 export default function App() {
-  const [tab, setTab] = useState<TabId>("database");
+  const [tab, setTab] = useState<TabId>("dashboard");
   const [version, setVersion] = useState("…");
   const discord = useDiscordStatus();
+  const spoofer = useSpoofer();
 
   const active = NAV.find((item) => item.id === tab) ?? NAV[0];
 
@@ -120,9 +124,25 @@ export default function App() {
         </header>
 
         <section className="scrollbar-thin flex-1 overflow-y-auto p-6">
-          {tab === "database" ? (
-            <DatabaseView />
-          ) : (
+          {tab === "dashboard" && (
+            <DashboardView
+              status={spoofer.status}
+              tick={spoofer.tick}
+              start={spoofer.start}
+              pause={spoofer.pause}
+              resume={spoofer.resume}
+              stop={spoofer.stop}
+              onOpenDatabase={() => setTab("database")}
+            />
+          )}
+
+          {tab === "database" && <DatabaseView />}
+
+          {tab === "console" && (
+            <ConsoleView logs={spoofer.logs} onClear={spoofer.clearLogs} />
+          )}
+
+          {tab !== "dashboard" && tab !== "database" && tab !== "console" && (
             <PlaceholderView title={active.label} stage={active.stage} />
           )}
         </section>
