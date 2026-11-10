@@ -1,6 +1,6 @@
 [package]
 name = "discord-badge-utility"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local game activity helper for Discord profile badges"
 authors = ["nellzdsg"]
 license = "MIT"

@@ -27,7 +27,7 @@
 
 ### Portable-версия (проще всего)
 
-1. Скачайте файл `discord-badge-utility_0.1.0_x64_portable.exe` со страницы
+1. Скачайте файл `discord-badge-utility_0.1.1_x64_portable.exe` со страницы
    [Releases](https://github.com/nellzdsg/discord-badge-utility/releases).
    Номер версии в имени файла может быть новее.
 2. Положите его в любую папку — например, на рабочий стол.
@@ -37,7 +37,7 @@
 
 ### Установщик
 
-1. Скачайте `discord-badge-utility_0.1.0_x64_setup.exe`.
+1. Скачайте `discord-badge-utility_0.1.1_x64_setup.exe`.
 2. Запустите и следуйте подсказкам.
 3. После установки ярлык появится в меню «Пуск».
 
@@ -215,7 +215,7 @@ portable-версию.
 PowerShell:
 
 ```powershell
-Get-FileHash .\discord-badge-utility_0.1.0_x64_portable.exe -Algorithm SHA256
+Get-FileHash .\discord-badge-utility_0.1.1_x64_portable.exe -Algorithm SHA256
 ```
 
 Полученный хеш должен совпасть со строкой в `SHA256SUMS.txt`.
