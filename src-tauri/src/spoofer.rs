@@ -344,10 +344,7 @@ pub async fn run(
     }
 
     let batch_size = config.batch_size.clamp(1, MAX_ACTIVE);
-    let hold = apply_jitter(
-        Duration::from_secs(config.hold_secs.clamp(1, 3600)),
-        config.jitter,
-    );
+    let base_hold = Duration::from_secs(config.hold_secs.clamp(1, 3600));
 
     let root = temp_root();
     cleanup(&root);
@@ -395,11 +392,11 @@ pub async fn run(
         &msg(
             format!(
                 "Старт: {total} игр, батч {batch_size}, удержание {} с.",
-                hold.as_secs()
+                base_hold.as_secs()
             ),
             format!(
                 "Started: {total} games, batch {batch_size}, hold {} s.",
-                hold.as_secs()
+                base_hold.as_secs()
             ),
         ),
     );
@@ -550,7 +547,7 @@ pub async fn run(
             failed,
         );
 
-        let completed = wait_with_controls(hold, &ctx).await;
+        let completed = wait_with_controls(apply_jitter(base_hold, config.jitter), &ctx).await;
 
         for pid in &pids {
             force_kill(*pid);
